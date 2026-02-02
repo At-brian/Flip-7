@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎴 Flip Seven - Compteur</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .app { min-height: 100vh; background: linear-gradient(to bottom, #312e81, #581c87); padding: 1rem; padding-bottom: 2rem; }
+    .header { text-align: center; margin-bottom: 1rem; }
+    .header h1 { font-size: 1.875rem; font-weight: 700; color: white; margin-bottom: 0.25rem; }
+    .header p { color: #c7d2fe; font-size: 0.875rem; }
+    
+    .card { background: white; border-radius: 1rem; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    
+    .round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .round-badge { background: #6366f1; color: white; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600; }
+    
+    .player-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.75rem; background: #f3f4f6; border-radius: 0.75rem; }
+    .player-name { flex: 1; font-weight: 600; font-size: 1rem; }
+    .player-name input { width: 100%; background: transparent; border: none; border-bottom: 2px solid #818cf8; outline: none; font-weight: 600; font-size: 1rem; }
+    .score-input { width: 70px; padding: 0.5rem; border: 2px solid #d1d5db; border-radius: 0.5rem; text-align: center; font-weight: 700; font-size: 1.25rem; }
+    .score-input:focus { border-color: #6366f1; outline: none; }
+    .player-total { min-width: 60px; text-align: right; font-weight: 700; color: #6366f1; }
+    
+    .btn { border: none; cursor: pointer; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: transform 0.1s; }
+    .btn:active { transform: scale(0.95); }
+    .btn-primary { background: #22c55e; color: white; width: 100%; font-size: 1.125rem; }
+    .btn-secondary { background: rgba(255,255,255,0.2); color: white; }
+    .btn-small { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 9999px; }
+    .btn-gray { background: #e5e7eb; color: #374151; }
+    
+    .actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
+    
+    .history { background: rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; margin-top: 1rem; }
+    .history h3 { color: white; font-size: 1rem; margin-bottom: 0.75rem; }
+    .history-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; margin-bottom: 0.5rem; color: white; font-size: 0.875rem; }
+    .history-winner { color: #fde047; font-weight: 600; }
+    .history-scores { color: #c7d2fe; font-size: 0.75rem; }
+    
+    .leaderboard { background: rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.75rem; margin-bottom: 1rem; }
+    .leaderboard-title { color: rgba(255,255,255,0.7); font-size: 0.875rem; text-align: center; margin-bottom: 0.5rem; }
+    .leaderboard-row { display: flex; justify-content: space-between; padding: 0.25rem 0.5rem; color: white; }
+    .leaderboard-row.leader { background: rgba(255,255,255,0.1); border-radius: 0.25rem; font-weight: 700; }
+    
+    .winner-banner { text-align: center; padding: 0.5rem; background: #22c55e; color: white; border-radius: 0.5rem; margin-bottom: 0.75rem; font-weight: 600; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    
+    .remove-btn { background: #fecaca; color: #991b1b; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.75rem; }
+    
+    input[type="number"] { -moz-appearance: textfield; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState } = React;
+
+    function FlipSevenCounter() {
+      const [players, setPlayers] = useState([
+        { id: 1, name: 'Joueur 1', total: 0 },
+        { id: 2, name: 'Joueur 2', total: 0 }
+      ]);
+      const [roundScores, setRoundScores] = useState({});
+      const [history, setHistory] = useState([]);
+      const [editingName, setEditingName] = useState(null);
+
+      const TARGET = 250;
+      const currentRound = history.length + 1;
+
+      const updateRoundScore = (playerId, value) => {
+        setRoundScores(prev => ({ ...prev, [playerId]: value }));
+      };
+
+      const validateRound = () => {
+        // Calculer les scores du tour (champ vide = 0)
+        const scores = players.map(p => ({
+          id: p.id,
+          name: p.name,
+          score: parseInt(roundScores[p.id]) || 0
+        }));
+
+        // Trouver le meilleur score du tour
+        const maxScore = Math.max(...scores.map(s => s.score));
+        const winners = scores.filter(s => s.score === maxScore);
+
+        // Mettre à jour les totaux
+        setPlayers(prev => prev.map(p => ({
+          ...p,
+          total: p.total + (parseInt(roundScores[p.id]) || 0)
+        })));
+
+        // Ajouter à l'historique
+        setHistory(prev => [...prev, {
+          round: currentRound,
+          scores: scores,
+          winners: winners,
+          maxScore: maxScore
+        }]);
+
+        // Reset les scores du tour
+        setRoundScores({});
+      };
+
+      const addPlayer = () => {
+        const maxId = players.length > 0 ? Math.max(...players.map(p => p.id)) : 0;
+        const newId = maxId + 1;
+        setPlayers(prev => [...prev, { id: newId, name: `Joueur ${newId}`, total: 0 }]);
+      };
+
+      const removePlayer = (id) => {
+        if (players.length > 2) {
+          setPlayers(prev => prev.filter(p => p.id !== id));
+          setRoundScores(prev => {
+            const newScores = { ...prev };
+            delete newScores[id];
+            return newScores;
+          });
+        }
+      };
+
+      const updateName = (id, name) => {
+        setPlayers(prev => prev.map(p => 
+          p.id === id ? { ...p, name: name || `Joueur ${id}` } : p
+        ));
+      };
+
+      const resetAll = () => {
+        setPlayers(prev => prev.map(p => ({ ...p, total: 0 })));
+        setRoundScores({});
+        setHistory([]);
+      };
+
+      const sortedPlayers = [...players].sort((a, b) => b.total - a.total);
+      const gameWinner = sortedPlayers.find(p => p.total >= TARGET);
+
+      return (
+        <div className="app">
+          {/* Header */}
+          <div className="header">
+            <h1>🎴 Flip Seven</h1>
+            <p>Premier à {TARGET} points !</p>
+          </div>
+
+          {/* Classement */}
+          <div className="leaderboard">
+            <div className="leaderboard-title">🏆 Classement</div>
+            {sortedPlayers.map((p, idx) => (
+              <div key={p.id} className={`leaderboard-row ${idx === 0 ? 'leader' : ''}`}>
+                <span>{idx === 0 ? '👑 ' : ''}{p.name}</span>
+                <span>{p.total} pts</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Vainqueur de la partie */}
+          {gameWinner && (
+            <div className="winner-banner">
+              🎉 {gameWinner.name} remporte la partie avec {gameWinner.total} points !
+            </div>
+          )}
+
+          {/* Tour actuel */}
+          <div className="card">
+            <div className="round-header">
+              <span className="round-badge">Tour {currentRound}</span>
+              <div style={{display: 'flex', gap: '0.5rem'}}>
+                <button onClick={addPlayer} className="btn btn-small btn-gray">+ Joueur</button>
+              </div>
+            </div>
+
+            {players.map(player => (
+              <div key={player.id} className="player-row">
+                {editingName === player.id ? (
+                  <div className="player-name">
+                    <input
+                      type="text"
+                      defaultValue={player.name}
+                      autoFocus
+                      onBlur={(e) => {
+                        updateName(player.id, e.target.value);
+                        setEditingName(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          updateName(player.id, e.target.value);
+                          setEditingName(null);
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <span 
+                    className="player-name" 
+                    onClick={() => setEditingName(player.id)}
+                    style={{cursor: 'pointer'}}
+                  >
+                    {player.name} ✏️
+                  </span>
+                )}
+                
+                <input
+                  type="number"
+                  className="score-input"
+                  placeholder="0"
+                  value={roundScores[player.id] !== undefined ? roundScores[player.id] : ''}
+                  onChange={(e) => updateRoundScore(player.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') validateRound();
+                  }}
+                />
+                
+                <div className="player-total">
+                  {player.total} pts
+                </div>
+
+                {players.length > 2 && (
+                  <button onClick={() => removePlayer(player.id)} className="remove-btn">✕</button>
+                )}
+              </div>
+            ))}
+
+            <button onClick={validateRound} className="btn btn-primary">
+              ✓ Valider le tour
+            </button>
+          </div>
+
+          {/* Historique des tours */}
+          {history.length > 0 && (
+            <div className="history">
+              <h3>📜 Historique des tours</h3>
+              {[...history].reverse().map(h => (
+                <div key={h.round} className="history-item">
+                  <div>
+                    <div>Tour {h.round}</div>
+                    <div className="history-scores">
+                      {h.scores.map(s => `${s.name}: ${s.score}`).join(' | ')}
+                    </div>
+                  </div>
+                  <div className="history-winner">
+                    🏆 {h.winners.map(w => w.name).join(', ')} (+{h.maxScore})
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="actions">
+            <button onClick={resetAll} className="btn btn-secondary">
+              🔄 Nouvelle partie
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<FlipSevenCounter />);
+  </script>
+</body>
+</html>
